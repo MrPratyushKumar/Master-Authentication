@@ -2,7 +2,8 @@ import { User } from "../models/user.model.js";
 import bcryptjs from "bcryptjs";
 import { generateVerificationToken } from "../utils/generateVerificationCode.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendVerificationEmail, sendWelcomeEmail } from "../mailtrap/emails.js"; // ← single import, both functions
+import { sendVerificationEmail, sendWelcomeEmail,  sendPasswordResetEmail } from "../mailtrap/emails.js"; // ← single import, both functions
+import crypto from "crypto";
 
 // ─── SIGNUP ───────────────────────────────────────────────────────────────────
 export const signup = async (req, res) => {
@@ -162,5 +163,23 @@ export const login = async (req , res) => {
 
 // ─── LOGOUT ───────────────────────────────────────────────────────────────────
 export const logout = async (req, res) => {
-  res.send("logout route");
+  try {
+    // just clear the the JWT cookie - no DB operation needed 
+    res.clearCookie("token");
+    res.status(200).json({
+      success : true,
+      message : "Logged out successfully"
+    })
+  } catch (error) {
+    res.status(500).json({
+      success : false,
+      message : error.message
+    });
+  }
 };
+
+// ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+
+export const forgotPassword = async (req , res) => {
+  const {email} = req.body
+}
