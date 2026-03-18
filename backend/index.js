@@ -2,6 +2,7 @@ import express from "express";
 import { connectDB } from "./db/connectDB.js";
 import dotenv from "dotenv";
 import autRoutes from "./routes/auth.routes.js";
+import cookieParser from "cookie-parser";
 
 dotenv.config();
 
@@ -11,6 +12,7 @@ const PORT = process.env.PORT || 5000;
 // ✅ Middleware FIRST
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(cookieParser()); // ← add — must be before routes
 
 // ✅ Routes AFTER
 app.get("/", (req, res) => {

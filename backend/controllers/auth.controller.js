@@ -285,16 +285,27 @@ export const resetPassword = async(req , res)  => {
 }
 
 // ─── CHECK AUTH ───────────────────────────────────────────────────────────────
+// This runs AFTER verifyToken middleware
+// By the time we reach here, req.userId is already set by verifyToken
+// We just look up the user in DB and return their data
+
 export const checkAuth = async (req, res) => {
   try {
+    // 1. Find user by ID that verifyToken attached to the request
+    // .select("-password") means: return everything EXCEPT the password field
     const user = await User.findById(req.userId).select("-password");
+    // 2. If user not found in DB (maybe deleted after token was issued)
     if (!user) {
       return res.status(400).json({
         success: false,
         message: "User not found",
       });
     }
-    res.status(200).json({ success: true, user });
+    // 3. User found — return their data to the frontend
+
+    res.status(200).json({ success: true,
+    user , // password already excluded by .select("-password")
+  });
   } catch (error) {
     res.status(500).json({
       success: false,

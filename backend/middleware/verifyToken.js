@@ -24,12 +24,14 @@ export const verifyToken = (req , res , next) => {
     // 3.verify the token using our JWT_SECRET from .env
     // jwt.verify() will throw an error if token is invalid or expired
     const decoded = jwt.verify(token , process.env.JWT_SECRET);
+    console.log("Decoded token:", decoded); // ← add this
 
 
     // 4. Attach userId to the request object
     // Now any route that comes after this middleware can use req.userId
     // This is how checkAuth knows WHICH user to look up
-    req.userId = decoded.userId; // "userid" matches what you set in generateTokenAndSetCookie.js
+    req.userId = decoded.userid; // "userid" matches what you set in generateTokenAndSetCookie.js
+    
 
     // 5.Call next() to move on to the actual route handler
     next();
