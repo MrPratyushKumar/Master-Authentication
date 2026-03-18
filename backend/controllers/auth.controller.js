@@ -5,6 +5,7 @@ import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js
 import { sendVerificationEmail, sendWelcomeEmail,  sendPasswordResetEmail } from "../mailtrap/emails.js"; // ← single import, both functions
 import crypto from "crypto";
 
+
 // ─── SIGNUP ───────────────────────────────────────────────────────────────────
 export const signup = async (req, res) => {
   const { email, password, name } = req.body;
@@ -181,5 +182,49 @@ export const logout = async (req, res) => {
 // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
 
 export const forgotPassword = async (req , res) => {
-  const {email} = req.body
+  const {email} = req.body;
+  try {
+    // 1. validate field 
+    if(!email) {
+      return res.status(400).json({
+        success : false,
+        message : "Email is required"
+      })
+    }
+
+    // 2. find user 
+    const user = await User.findOne({email});
+
+    // 3. Same response whether email exist or not -  prevents user enumeration
+    if(!user){
+      return res.status(200).json({
+        success : true ,
+        message : "If that email exists, a reset link has been sent"
+      });
+    }
+
+    // 4. Generate reset token (crypto  -> ot th 6- digit one)
+    const resetToken = crypto.randomBytes(20).toString("hex");
+
+    // 5 . save token + expiry (1 hour) to user 
+    user.resetPasswordToken = resetToken;
+    user.resetPasswordExpiresAt = Date.now() + 1 * 60 * 60 * 1000;
+    await user.save();
+
+    // 6. Build reset url and send email
+    const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
+    await sendPasswordResetEmail(user.email , resetURL);
+
+    res.status(200).json({
+      success : true,
+      message : "If that email exists , a reset link has been sent",
+    })
+
+
+  } catch (error) {
+    res.status(500).json({
+      success : false,
+      message : error.message,
+    })
+  }
 }
