@@ -95,9 +95,70 @@ export const verifyEmail = async (req, res) => {
 };
 
 // ─── LOGIN ────────────────────────────────────────────────────────────────────
-export const login = async (req, res) => {
-  res.send("login route");
-};
+export const login = async (req , res) => {
+  const {email , password} = req.body;
+
+  try {
+    // 1 . validate fields
+    if(!email || !password){
+      return res.status(400).json({
+        success : false,
+        message : "All fields are required",
+      });
+    }
+
+    // 2. find user 
+    const user = await User.findOne({email});
+    if(!user){
+      return res.status(400).json({
+        success : false,
+        message : "Invalid credentials",  // never say "email not found" — security
+      })
+    }
+
+    // 3. Check password 
+    const isPasswordValid = await bcryptjs.compare(password , user.password);
+    if(!isPasswordValid){
+      return res.status(400).json({
+        success : false,
+        message : "Invalid credentials",
+      })
+    }
+
+    // 4. Block unverified users;
+    if(!user.isVerified){
+      return res.status(403).json({
+        success : false,
+        message : "Please verified your email before login",
+      });
+    } 
+
+    // 5. set JWt Token 
+    generateTokenAndSetCookie(res , user._id);
+
+    // 6. update last login 
+    user.lastLogin = Date.now();
+
+    await user.save();
+
+    // 7. respond
+    res.status(200).json({
+      success : true,
+      message : "Logged in successFully",
+      user : {
+        ...user._doc,
+        password : undefined,
+        verificationToken : undefined,
+        verificationTokenExpiresAt : undefined
+      },
+    })
+  } catch (error) {
+    res.status(500).json({
+      success : false,
+      message : error.message
+    })
+  }
+}
 
 // ─── LOGOUT ───────────────────────────────────────────────────────────────────
 export const logout = async (req, res) => {
