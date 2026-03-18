@@ -2,7 +2,7 @@ import { User } from "../models/user.model.js";
 import bcryptjs from "bcryptjs";
 import { generateVerificationToken } from "../utils/generateVerificationCode.js";
 import { generateTokenAndSetCookie } from "../utils/generateTokenAndSetCookie.js";
-import { sendVerificationEmail, sendWelcomeEmail,  sendPasswordResetEmail } from "../mailtrap/emails.js"; // ← single import, both functions
+import { sendVerificationEmail, sendWelcomeEmail,  sendPasswordResetEmail ,  sendResetSuccessEmail  } from "../mailtrap/emails.js"; // ← single import, both functions
 import crypto from "crypto";
 
 
@@ -181,50 +181,124 @@ export const logout = async (req, res) => {
 
 // ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
 
-export const forgotPassword = async (req , res) => {
-  const {email} = req.body;
+// ─── FORGOT PASSWORD ──────────────────────────────────────────────────────────
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
   try {
-    // 1. validate field 
-    if(!email) {
+    if (!email) {
       return res.status(400).json({
-        success : false,
-        message : "Email is required"
-      })
-    }
-
-    // 2. find user 
-    const user = await User.findOne({email});
-
-    // 3. Same response whether email exist or not -  prevents user enumeration
-    if(!user){
-      return res.status(200).json({
-        success : true ,
-        message : "If that email exists, a reset link has been sent"
+        success: false,
+        message: "Email is required",
       });
     }
 
-    // 4. Generate reset token (crypto  -> ot th 6- digit one)
+    const user = await User.findOne({ email });
+
+    if (!user) {
+      return res.status(200).json({
+        success: true,
+        message: "If that email exists, a reset link has been sent",
+      });
+    }
+
     const resetToken = crypto.randomBytes(20).toString("hex");
 
-    // 5 . save token + expiry (1 hour) to user 
     user.resetPasswordToken = resetToken;
     user.resetPasswordExpiresAt = Date.now() + 1 * 60 * 60 * 1000;
     await user.save();
 
-    // 6. Build reset url and send email
+    // ✅ Build URL first, then send once — remove the duplicate line
     const resetURL = `${process.env.CLIENT_URL}/reset-password/${resetToken}`;
-    await sendPasswordResetEmail(user.email , resetURL);
+    await sendPasswordResetEmail(user.email, resetURL);
 
     res.status(200).json({
-      success : true,
-      message : "If that email exists , a reset link has been sent",
-    })
-
+      success: true,
+      message: "If that email exists, a reset link has been sent",
+    });
 
   } catch (error) {
     res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
+
+// ─── RESET PASSWORD ───────────────────────────────────────────────────────────
+
+export const resetPassword = async(req , res)  => {
+  const {token} = req.params;
+  const {password} = req.body;
+  try {
+    // Validate field 
+    if(!password){
+      return res.status(400).json({
+        success : false,
+        message : "Password is required"
+      });
+    }
+
+    if(password.length < 8){
+      return res.status(400).json({
+        success : false,
+        message : " Password must be at least 8 characters",
+      });
+    }
+
+    // 2. find user with valid token 
+    const user = await User.findOne({
+      resetPasswordToken : token,
+      resetPasswordExpiresAt :{ $gt: Date.now() }, 
+    });
+
+    if(!user) {
+      return res.status(400).json({
+        success: false,
+        message:"Invalid or expired rest link"
+      })
+    }
+
+    // 3. Hash new password 
+    const hashedPassword = await bcryptjs.hash(password , 10);
+    
+    // 4. Update password + clear reset token fields
+
+    user.password = hashedPassword;
+    user.resetPasswordToken = undefined;
+    user.resetPasswordExpiresAt = undefined;
+
+    await user.save();
+
+    // 5. send success email
+    await sendResetSuccessEmail(user.email);
+
+    res.status(200).json({
+      success : true,
+      message: " Password reset successFully",
+    });
+  } catch (error) {
+    res.status(500).json({
       success : false,
-      message : error.message,
+      message: error.message
     })
   }
 }
+
+// ─── CHECK AUTH ───────────────────────────────────────────────────────────────
+export const checkAuth = async (req, res) => {
+  try {
+    const user = await User.findById(req.userId).select("-password");
+    if (!user) {
+      return res.status(400).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+    res.status(200).json({ success: true, user });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      message: error.message,
+    });
+  }
+};
